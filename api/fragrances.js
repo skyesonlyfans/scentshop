@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  const search = String(req.query.search || "").trim();
+  const search = String(req.query.search || req.query.q || "").trim();
 
   if (!search) {
     return res.status(400).json({
@@ -7,50 +7,53 @@ export default async function handler(req, res) {
     });
   }
 
-  const apiKey = process.env.FRAGELLA_API_KEY;
+  const rapidApiKey = process.env.RAPIDAPI_KEY;
 
-  if (!apiKey) {
+  if (!rapidApiKey) {
     return res.status(500).json({
-      error: "FRAGELLA_API_KEY is not configured in Vercel."
+      error: "RAPIDAPI_KEY is not configured in Vercel."
     });
   }
 
   try {
-    const fragellaUrl =
-      `https://api.fragella.com/api/v1/fragrances?search=${encodeURIComponent(search)}`;
+    const apiUrl =
+      `https://fragrancefinder-api.p.rapidapi.com/perfumes/search?q=${encodeURIComponent(search)}`;
 
-    const fragellaResponse = await fetch(fragellaUrl, {
+    const apiResponse = await fetch(apiUrl, {
       method: "GET",
       headers: {
-        "x-api-key": apiKey,
+        "X-RapidAPI-Key": rapidApiKey,
+        "X-RapidAPI-Host": "fragrancefinder-api.p.rapidapi.com",
+        "Content-Type": "application/json",
         Accept: "application/json"
       }
     });
 
-    const rawText = await fragellaResponse.text();
+    const rawText = await apiResponse.text();
 
     let data;
     try {
       data = JSON.parse(rawText);
     } catch {
       return res.status(502).json({
-        error: "Fragella returned a non-JSON response.",
-        status: fragellaResponse.status,
-        raw: rawText.slice(0, 500)
+        error: "Fragrance Finder returned a non-JSON response.",
+        status: apiResponse.status,
+        raw: rawText.slice(0, 800)
       });
     }
 
-    if (!fragellaResponse.ok) {
-      return res.status(fragellaResponse.status).json({
-        error: "Fragella API request failed.",
-        status: fragellaResponse.status,
+    if (!apiResponse.ok) {
+      return res.status(apiResponse.status).json({
+        error: "Fragrance Finder API request failed.",
+        status: apiResponse.status,
         details: data
       });
     }
 
     const list = getFragranceList(data);
-
-    const normalized = list.map((item, index) => normalizeFragrance(item, index));
+    const normalized = list.map((item, index) =>
+      normalizeFragrance(item, index)
+    );
 
     return res.status(200).json({
       query: search,
@@ -62,7 +65,7 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     return res.status(500).json({
-      error: "Unable to reach Fragella API.",
+      error: "Unable to reach Fragrance Finder API.",
       message: error?.message || "Unknown server error"
     });
   }
@@ -71,12 +74,14 @@ export default async function handler(req, res) {
 function getFragranceList(data) {
   if (Array.isArray(data)) return data;
 
+  if (Array.isArray(data?.perfumes)) return data.perfumes;
   if (Array.isArray(data?.fragrances)) return data.fragrances;
   if (Array.isArray(data?.results)) return data.results;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.items)) return data.items;
   if (Array.isArray(data?.matches)) return data.matches;
 
+  if (data?.perfume) return [data.perfume];
   if (data?.fragrance) return [data.fragrance];
   if (data?.result) return [data.result];
 
@@ -91,10 +96,14 @@ function normalizeFragrance(item, index) {
     item.house ||
     item.designer ||
     item.maker ||
+    item.company ||
     "Unknown brand";
 
   const name =
     item.name ||
+    item.perfume ||
+    item.perfume_name ||
+    item.perfumeName ||
     item.fragrance_name ||
     item.fragranceName ||
     item.title ||
@@ -125,6 +134,7 @@ function normalizeFragrance(item, index) {
     item.mainImage ||
     item.bottle_image ||
     item.bottleImage ||
+    item.picture ||
     "";
 
   return {
@@ -144,40 +154,86 @@ function normalizeFragrance(item, index) {
       item.release_year ||
       item.releaseYear ||
       "",
-    accords:
-      item.accords || [],
-    top_notes:
-      item.top_notes || item.topNotes || item.top || [],
-    middle_notes:
-      item.middle_notes || item.middleNotes || item.heart_notes || item.heartNotes || item.middle || [],
-    base_notes:
-      item.base_notes || item.baseNotes || item.base || [],
+    accords: normalizeArray(
+      item.accords ||
+      item.main_accords ||
+      item.mainAccords
+    ),
+    top_notes: normalizeArray(
+      item.top_notes ||
+      item.topNotes ||
+      item.top
+    ),
+    middle_notes: normalizeArray(
+      item.middle_notes ||
+      item.middleNotes ||
+      item.heart_notes ||
+      item.heartNotes ||
+      item.middle
+    ),
+    base_notes: normalizeArray(
+      item.base_notes ||
+      item.baseNotes ||
+      item.base
+    ),
     raw: item
   };
 }
 
+function normalizeArray(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => {
+        if (typeof item === "string") return item;
+        return item?.name || item?.label || item?.title || "";
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
 function buildDescriptionFromNotes(item) {
-  const top = item.top_notes || item.topNotes || item.top || [];
-  const middle =
+  const top = normalizeArray(
+    item.top_notes ||
+    item.topNotes ||
+    item.top
+  );
+
+  const middle = normalizeArray(
     item.middle_notes ||
     item.middleNotes ||
     item.heart_notes ||
     item.heartNotes ||
-    item.middle ||
-    [];
-  const base = item.base_notes || item.baseNotes || item.base || [];
+    item.middle
+  );
+
+  const base = normalizeArray(
+    item.base_notes ||
+    item.baseNotes ||
+    item.base
+  );
 
   const parts = [];
 
-  if (Array.isArray(top) && top.length) {
+  if (top.length) {
     parts.push(`Top notes include ${top.join(", ")}`);
   }
 
-  if (Array.isArray(middle) && middle.length) {
+  if (middle.length) {
     parts.push(`middle notes include ${middle.join(", ")}`);
   }
 
-  if (Array.isArray(base) && base.length) {
+  if (base.length) {
     parts.push(`base notes include ${base.join(", ")}`);
   }
 
