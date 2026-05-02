@@ -199,7 +199,6 @@
             const offset = (page - 1) * limit;
             
             // Heuristic: If query is short or looks like a brand name, try the brand endpoint first
-            // Otherwise, use the standard search
             const isBrandSearch = query.split(' ').length === 1; 
 
             const urls = isBrandSearch ? [
@@ -221,14 +220,16 @@
                     });
 
                     if (response.ok) {
-                        return await response.json();
+                        const json = await response.json();
+                        // Verify the response actually contains data before returning
+                        if (extractItems(json).length > 0) return json;
                     }
                 } catch (err) {
                     console.warn(`Endpoint failed: ${url}`, err);
                 }
             }
 
-            // Fallback to Mock Data
+            // Fallback to Mock Data if no results found across endpoints
             return { isMockFallback: true, query: query, page: page };
         }
 
@@ -236,12 +237,13 @@
             pageInfo.textContent = `Page ${currentPage}`;
             prevBtn.disabled = currentPage === 1;
             
-            // In a real API, you'd check 'total' results. Here we assume more if we got a full page.
             let items = extractItems(data);
+            // Real API might return total count, otherwise we disable "Next" if we didn't hit the limit
             nextBtn.disabled = items.length < limit;
         }
 
         function extractItems(data) {
+            if (!data) return [];
             if (data.isMockFallback) return getMockData(data.query, data.page);
             if (Array.isArray(data)) return data;
             if (data.data && Array.isArray(data.data)) return data.data;
@@ -329,7 +331,6 @@
         }
 
         function getMockData(query, page) {
-            // Expanded mock data to simulate pagination
             const allMocks = [];
             const brands = ['Dior', 'Chanel', 'Tom Ford', 'YSL', 'Gucci'];
             
