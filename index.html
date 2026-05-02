@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>ScentShop by Skye</title>
 
   <style>
@@ -11,8 +12,8 @@
       --bg-soft: #fdf2f8;
       --text: #18181b;
       --muted: #71717a;
-      --card: rgba(255, 255, 255, 0.82);
-      --border: rgba(255, 255, 255, 0.8);
+      --card: rgba(255, 255, 255, 0.84);
+      --border: rgba(255, 255, 255, 0.82);
       --pink: #db2777;
       --pink-soft: #fce7f3;
       --black: #09090b;
@@ -38,13 +39,17 @@
         sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(251, 207, 232, 0.6), transparent 34%),
+        radial-gradient(circle at top left, rgba(251, 207, 232, 0.62), transparent 34%),
         linear-gradient(135deg, var(--bg), #ffffff, var(--bg-soft));
     }
 
     button,
     input {
       font: inherit;
+    }
+
+    button {
+      -webkit-tap-highlight-color: transparent;
     }
 
     a {
@@ -250,7 +255,12 @@
     .feature-overlay {
       position: absolute;
       inset: 0;
-      background: linear-gradient(to top, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0.08), transparent);
+      background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.78),
+        rgba(0, 0, 0, 0.08),
+        transparent
+      );
     }
 
     .feature-text {
@@ -295,6 +305,7 @@
       color: #78350f;
       font-size: 14px;
       line-height: 1.6;
+      white-space: pre-wrap;
     }
 
     .alert.show {
@@ -439,11 +450,37 @@
       letter-spacing: -0.05em;
     }
 
+    .details-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
     .details-desc {
       margin: 18px 0 0;
       color: #52525b;
       font-size: 16px;
       line-height: 1.8;
+    }
+
+    .notes {
+      display: grid;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .note-row {
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      padding: 12px 14px;
+      color: #52525b;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .note-row strong {
+      color: var(--text);
     }
 
     .actions {
@@ -624,18 +661,14 @@
     /*
       ScentShop by Skye frontend.
 
-      Required Vercel environment variables:
+      This file calls your own Vercel API route:
+        /api/fragrances?search=Sauvage
 
-      Server-only:
-        FRAGELLA_API_KEY
+      Your secret Fragella key should ONLY be used in:
+        api/fragrances.js
 
-      Public:
-        NEXT_PUBLIC_FRAGELLA_WIDGET_KEY
-
-      Important:
-      A plain static index.html cannot read Vercel env vars directly at runtime.
-      Since Fragella's widget key is public by design, it is safe to expose here.
-      Your secret key must stay inside the /api/fragrances endpoint.
+      A static index.html cannot directly read Vercel environment variables.
+      The public widget key is safe to expose in frontend code.
     */
 
     const FRAGELLA_PUBLIC_WIDGET_KEY =
@@ -643,39 +676,6 @@
 
     const FALLBACK_IMAGE =
       "https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=900&q=80";
-
-    const DEMO_FRAGRANCES = [
-      {
-        id: "demo-1",
-        name: "Sauvage",
-        brand: "Dior",
-        description:
-          "A fresh aromatic fragrance with bright citrus, spicy pepper, and a clean woody trail. Built for bold everyday wear.",
-        image:
-          "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?auto=format&fit=crop&w=900&q=80",
-        gender: "Cologne"
-      },
-      {
-        id: "demo-2",
-        name: "Libre",
-        brand: "Yves Saint Laurent",
-        description:
-          "A luminous floral scent balancing lavender, orange blossom, and warm vanilla. Polished, modern, and confident.",
-        image:
-          "https://images.unsplash.com/photo-1615634260167-c8cdede054de?auto=format&fit=crop&w=900&q=80",
-        gender: "Perfume"
-      },
-      {
-        id: "demo-3",
-        name: "Cloud",
-        brand: "Ariana Grande",
-        description:
-          "A playful gourmand fragrance with airy sweetness, creamy woods, and a soft musky finish.",
-        image:
-          "https://images.unsplash.com/photo-1585386959984-a41552231658?auto=format&fit=crop&w=900&q=80",
-        gender: "Perfume"
-      }
-    ];
 
     let fragrances = [];
     let selectedFragrance = null;
@@ -700,49 +700,140 @@
             ? data.results
             : Array.isArray(data?.data)
               ? data.data
-              : [];
+              : Array.isArray(data?.items)
+                ? data.items
+                : Array.isArray(data?.matches)
+                  ? data.matches
+                  : [];
 
-      return list.map((item, index) => {
-        const brand =
-          item.brand ||
-          item.brand_name ||
-          item.house ||
-          item.designer ||
-          "Unknown brand";
+      return list.map((item, index) => normalizeFragrance(item, index));
+    }
 
-        const name =
-          item.name ||
-          item.fragrance_name ||
-          item.title ||
-          item.product_name ||
-          "Untitled fragrance";
+    function normalizeFragrance(item, index) {
+      const brand =
+        item.brand ||
+        item.brand_name ||
+        item.brandName ||
+        item.house ||
+        item.designer ||
+        item.maker ||
+        item.company ||
+        "Unknown brand";
 
-        return {
-          id: item.id || item.slug || `${brand}-${name}-${index}`,
-          name,
-          brand,
-          description:
-            item.description ||
-            item.summary ||
-            item.about ||
-            item.overview ||
-            item.short_description ||
-            "No description was returned for this fragrance yet.",
-          image:
-            item.image ||
-            item.image_url ||
-            item.imageUrl ||
-            item.photo ||
-            item.thumbnail ||
-            item.main_image ||
-            FALLBACK_IMAGE,
-          gender:
-            item.gender ||
-            item.type ||
-            item.category ||
-            "Fragrance"
-        };
-      });
+      const name =
+        item.name ||
+        item.fragrance_name ||
+        item.fragranceName ||
+        item.title ||
+        item.product_name ||
+        item.productName ||
+        "Untitled fragrance";
+
+      const description =
+        item.description ||
+        item.summary ||
+        item.about ||
+        item.overview ||
+        item.short_description ||
+        item.shortDescription ||
+        item.text ||
+        buildDescriptionFromNotes(item) ||
+        "Description unavailable.";
+
+      const image =
+        item.image ||
+        item.image_url ||
+        item.imageUrl ||
+        item.photo ||
+        item.photo_url ||
+        item.thumbnail ||
+        item.thumbnail_url ||
+        item.main_image ||
+        item.mainImage ||
+        item.bottle_image ||
+        item.bottleImage ||
+        item.picture ||
+        "";
+
+      return {
+        id: item.id || item.slug || `${brand}-${name}-${index}`,
+        name,
+        brand,
+        description,
+        image: image || FALLBACK_IMAGE,
+        gender:
+          item.gender ||
+          item.type ||
+          item.category ||
+          item.concentration ||
+          "Fragrance",
+        year:
+          item.year ||
+          item.release_year ||
+          item.releaseYear ||
+          "",
+        accords: normalizeArray(item.accords || item.main_accords || item.mainAccords),
+        top_notes: normalizeArray(item.top_notes || item.topNotes || item.top),
+        middle_notes: normalizeArray(
+          item.middle_notes ||
+          item.middleNotes ||
+          item.heart_notes ||
+          item.heartNotes ||
+          item.middle
+        ),
+        base_notes: normalizeArray(item.base_notes || item.baseNotes || item.base),
+        raw: item
+      };
+    }
+
+    function normalizeArray(value) {
+      if (!value) return [];
+
+      if (Array.isArray(value)) {
+        return value
+          .map((item) => {
+            if (typeof item === "string") return item;
+            return item?.name || item?.label || item?.title || "";
+          })
+          .filter(Boolean);
+      }
+
+      if (typeof value === "string") {
+        return value
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean);
+      }
+
+      return [];
+    }
+
+    function buildDescriptionFromNotes(item) {
+      const top = normalizeArray(item.top_notes || item.topNotes || item.top);
+      const middle = normalizeArray(
+        item.middle_notes ||
+        item.middleNotes ||
+        item.heart_notes ||
+        item.heartNotes ||
+        item.middle
+      );
+      const base = normalizeArray(item.base_notes || item.baseNotes || item.base);
+
+      const parts = [];
+
+      if (top.length) {
+        parts.push(`Top notes include ${top.join(", ")}`);
+      }
+
+      if (middle.length) {
+        parts.push(`middle notes include ${middle.join(", ")}`);
+      }
+
+      if (base.length) {
+        parts.push(`base notes include ${base.join(", ")}`);
+      }
+
+      return parts.length ? `${parts.join("; ")}.` : "";
     }
 
     function showAlert(message) {
@@ -775,6 +866,7 @@
     function renderFeatured(fragrance) {
       if (!fragrance) {
         featuredImageEl.src = FALLBACK_IMAGE;
+        featuredImageEl.alt = "Featured fragrance";
         featuredTitleEl.textContent = "Search fragrance profiles";
         featuredDescriptionEl.textContent =
           "Search a perfume or cologne to view details.";
@@ -791,7 +883,11 @@
       resultCountEl.textContent = `${fragrances.length} found`;
 
       if (!fragrances.length) {
-        resultsEl.innerHTML = "";
+        resultsEl.innerHTML = `
+          <div class="empty">
+            <p>No results yet.</p>
+          </div>
+        `;
         return;
       }
 
@@ -807,6 +903,7 @@
               <img
                 src="${escapeHtml(item.image || FALLBACK_IMAGE)}"
                 alt="${escapeHtml(item.brand)} ${escapeHtml(item.name)}"
+                onerror="this.src='${FALLBACK_IMAGE}'"
               />
               <div>
                 <span class="tag">${escapeHtml(item.gender)}</span>
@@ -838,17 +935,28 @@
         return;
       }
 
+      const notesHtml = renderNotes(fragrance);
+
       detailsEl.innerHTML = `
         <img
           class="details-image"
           src="${escapeHtml(fragrance.image || FALLBACK_IMAGE)}"
           alt="${escapeHtml(fragrance.brand)} ${escapeHtml(fragrance.name)}"
+          onerror="this.src='${FALLBACK_IMAGE}'"
         />
 
         <div>
           <p class="details-kicker">${escapeHtml(fragrance.brand)}</p>
           <h2 class="details-title">${escapeHtml(fragrance.name)}</h2>
+
+          <div class="details-meta">
+            <span class="tag">${escapeHtml(fragrance.gender)}</span>
+            ${fragrance.year ? `<span class="tag">${escapeHtml(fragrance.year)}</span>` : ""}
+          </div>
+
           <p class="details-desc">${escapeHtml(fragrance.description)}</p>
+
+          ${notesHtml}
 
           <div class="actions">
             <button class="secondary-button" type="button">♡ Add to wishlist</button>
@@ -860,6 +968,46 @@
       `;
 
       injectFragellaWidget(`${fragrance.brand} ${fragrance.name}`);
+    }
+
+    function renderNotes(fragrance) {
+      const rows = [];
+
+      if (fragrance.accords && fragrance.accords.length) {
+        rows.push(`
+          <div class="note-row">
+            <strong>Accords:</strong> ${escapeHtml(fragrance.accords.join(", "))}
+          </div>
+        `);
+      }
+
+      if (fragrance.top_notes && fragrance.top_notes.length) {
+        rows.push(`
+          <div class="note-row">
+            <strong>Top notes:</strong> ${escapeHtml(fragrance.top_notes.join(", "))}
+          </div>
+        `);
+      }
+
+      if (fragrance.middle_notes && fragrance.middle_notes.length) {
+        rows.push(`
+          <div class="note-row">
+            <strong>Middle notes:</strong> ${escapeHtml(fragrance.middle_notes.join(", "))}
+          </div>
+        `);
+      }
+
+      if (fragrance.base_notes && fragrance.base_notes.length) {
+        rows.push(`
+          <div class="note-row">
+            <strong>Base notes:</strong> ${escapeHtml(fragrance.base_notes.join(", "))}
+          </div>
+        `);
+      }
+
+      if (!rows.length) return "";
+
+      return `<div class="notes">${rows.join("")}</div>`;
     }
 
     function selectFragrance(fragrance) {
@@ -877,7 +1025,7 @@
 
       if (!FRAGELLA_PUBLIC_WIDGET_KEY) {
         mount.innerHTML =
-          "Add NEXT_PUBLIC_FRAGELLA_WIDGET_KEY to enable the Fragella accords widget.";
+          "Add the public Fragella widget key to enable the accords widget.";
         return;
       }
 
@@ -925,7 +1073,10 @@
           }
         );
 
-        const data = await response.json();
+        const contentType = response.headers.get("content-type") || "";
+        const data = contentType.includes("application/json")
+          ? await response.json()
+          : { error: await response.text() };
 
         if (!response.ok) {
           throw new Error(
@@ -944,17 +1095,29 @@
           renderFeatured(null);
           renderResults();
           renderDetails(null);
-          showAlert("No fragrances matched that search. Try a brand, scent name, or note.");
+
+          const rawShape = Array.isArray(data)
+            ? "array"
+            : Object.keys(data || {}).join(", ");
+
+          showAlert(
+            `No fragrances were returned for "${cleanQuery}".\n\nAPI response shape: ${rawShape || "unknown"}`
+          );
+
           return;
         }
 
         selectFragrance(fragrances[0]);
       } catch (error) {
-        fragrances = DEMO_FRAGRANCES;
-        selectFragrance(fragrances[0]);
+        fragrances = [];
+        selectedFragrance = null;
+
+        renderFeatured(null);
+        renderResults();
+        renderDetails(null);
 
         showAlert(
-          `${error.message || "Live Fragella search could not be reached."} Showing demo data. Confirm FRAGELLA_API_KEY is set in Vercel and that /api/fragrances is deployed.`
+          `${error.message || "Live Fragella search could not be reached."}\n\nTest this URL directly:\n/api/fragrances?search=${encodeURIComponent(cleanQuery)}`
         );
       } finally {
         setLoading(false);
@@ -966,6 +1129,9 @@
       searchFragrances(searchInput.value);
     });
 
+    renderFeatured(null);
+    renderResults();
+    renderDetails(null);
     searchFragrances(searchInput.value);
   </script>
 </body>
