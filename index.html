@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ScentShop by Skye &lt;3</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fragella Accords Widget Script -->
+    <script src="https://cdn.fragella.com/enrich.js" data-client-id="pub_ec1a59f2592e8f8192a33a7179ad89db4b53af6ea41664d9"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 
@@ -237,7 +241,11 @@
                     <div class="p-6 flex-1 flex flex-col bg-white/40">
                         <p class="text-xs font-bold text-pink-500 tracking-widest uppercase mb-1">${brand}</p>
                         <h3 class="text-xl font-bold text-gray-900 mb-2 serif-font leading-tight">${name} ${launchYear}</h3>
-                        <p class="text-sm text-gray-600 line-clamp-3 mb-6 flex-1 leading-relaxed">${description}</p>
+                        <p class="text-sm text-gray-600 line-clamp-3 mb-4 flex-1 leading-relaxed">${description}</p>
+                        
+                        <!-- Fragella Accords Widget -->
+                        <div class="fragella-inject-accords mb-4" data-fragrance-name="${name}"></div>
+
                         <button class="w-full py-3 mt-auto rounded-2xl bg-white text-gray-800 font-semibold border border-pink-100 shadow-sm hover:bg-gradient-to-r hover:from-pink-50 hover:to-rose-50 hover:text-pink-600 hover:border-pink-300 transition-all active:scale-95">
                             View Details
                         </button>
