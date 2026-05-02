@@ -50,7 +50,7 @@
         <header class="text-center py-12 sm:py-16">
             <div class="inline-flex items-center justify-center space-x-3 mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-pink-500">
-                    <path d="M10 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/>
+                    <path d="M10 5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/>
                     <path d="M14 5a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4z"/>
                     <path d="M8 11v1a4 4 0 0 0-4 4v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3a4 4 0 0 0-4-4v-1"/>
                     <path d="M12 15v.01"/>
@@ -73,7 +73,7 @@
                 <input 
                     type="text" 
                     id="search-input" 
-                    placeholder="Search for perfumes, colognes, or notes..." 
+                    placeholder="Search by brand (e.g. Dior) or fragrance name..." 
                     class="w-full pl-12 pr-32 py-4 sm:py-5 rounded-full glass-panel focus:outline-none focus:ring-4 focus:ring-pink-200/50 transition-all text-lg placeholder-gray-400"
                     required
                 >
@@ -95,7 +95,7 @@
                     <span class="text-4xl">✨</span>
                 </div>
                 <h2 class="text-2xl font-bold text-gray-700 mb-2">Ready to explore?</h2>
-                <p class="text-gray-500 max-w-md mx-auto">Type in a brand, specific perfume, or a scent profile like 'vanilla' or 'citrus' to see what we have in store.</p>
+                <p class="text-gray-500 max-w-md mx-auto">Type in a brand like 'Dior' or 'Chanel' or a specific fragrance name to browse our collection.</p>
             </div>
 
             <!-- Loading Spinner -->
@@ -104,7 +104,7 @@
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <p class="text-pink-600 font-medium animate-pulse">Consulting the Fragella API...</p>
+                <p class="text-pink-600 font-medium animate-pulse">Searching Fragella...</p>
             </div>
 
             <!-- Error Notification -->
@@ -113,8 +113,21 @@
             </div>
 
             <!-- Results Grid -->
-            <div id="results-grid" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8">
-                <!-- Fragrance cards will be injected here via JS -->
+            <div id="results-container" class="hidden">
+                <div id="results-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 sm:gap-8 mb-12">
+                    <!-- Fragrance cards injected here -->
+                </div>
+
+                <!-- Pagination Footer -->
+                <div class="flex items-center justify-center space-x-4 pb-12">
+                    <button id="prev-page" class="px-6 py-2 rounded-full glass-panel hover:bg-white transition-all disabled:opacity-30 disabled:cursor-not-allowed font-medium text-pink-600">
+                        Previous
+                    </button>
+                    <span id="page-info" class="text-sm font-bold text-gray-500 uppercase tracking-widest">Page 1</span>
+                    <button id="next-page" class="px-6 py-2 rounded-full glass-panel hover:bg-white transition-all disabled:opacity-30 disabled:cursor-not-allowed font-medium text-pink-600">
+                        Next
+                    </button>
+                </div>
             </div>
             
         </div>
@@ -125,6 +138,11 @@
         const FRAGELLA_API_KEY = '74c790894fe03b483f32891d96dee6e530ae94245042a672e48b0e535f9ed256';
         const FRAGELLA_WIDGET_KEY = 'pub_ec1a59f2592e8f8192a33a7179ad89db4b53af6ea41664d9';
 
+        // State Management
+        let currentQuery = '';
+        let currentPage = 1;
+        const limit = 10;
+
         // UI Elements
         const form = document.getElementById('search-form');
         const input = document.getElementById('search-input');
@@ -132,7 +150,11 @@
         const loadingState = document.getElementById('loading-state');
         const errorState = document.getElementById('error-state');
         const errorMessage = document.getElementById('error-message');
+        const resultsContainer = document.getElementById('results-container');
         const resultsGrid = document.getElementById('results-grid');
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+        const pageInfo = document.getElementById('page-info');
 
         // Main Search Handler
         form.addEventListener('submit', async (e) => {
@@ -140,36 +162,60 @@
             const query = input.value.trim();
             if (!query) return;
 
-            showState('loading');
+            currentQuery = query;
+            currentPage = 1;
+            performSearch();
+        });
 
+        async function performSearch() {
+            showState('loading');
             try {
-                const data = await fetchFromFragellaAPI(query);
-                renderResults(data, query);
+                const data = await fetchFromFragellaAPI(currentQuery, currentPage);
+                renderResults(data, currentQuery);
+                updatePaginationUI(data);
             } catch (error) {
                 console.error("Search Error:", error);
                 showState('error', "Something went wrong while searching. Please try again later!");
             }
+        }
+
+        // Pagination Listeners
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                performSearch();
+                window.scrollTo({ top: 400, behavior: 'smooth' });
+            }
         });
 
-        // Smart Fetcher: Tries multiple standard endpoint structures for Fragella, gracefully falls back to mock.
-        async function fetchFromFragellaAPI(query) {
-            // These are standard endpoints a fragrance API might use
-            const endpoints = [
-                `https://api.fragella.com/fragrances/search?q=${encodeURIComponent(query)}`,
-                `https://api.fragella.com/fragrances/match?q=${encodeURIComponent(query)}`,
-                `https://api.fragella.com/v1/fragrances?search=${encodeURIComponent(query)}`
+        nextBtn.addEventListener('click', () => {
+            currentPage++;
+            performSearch();
+            window.scrollTo({ top: 400, behavior: 'smooth' });
+        });
+
+        // API Fetcher
+        async function fetchFromFragellaAPI(query, page) {
+            const offset = (page - 1) * limit;
+            
+            // Heuristic: If query is short or looks like a brand name, try the brand endpoint first
+            // Otherwise, use the standard search
+            const isBrandSearch = query.split(' ').length === 1; 
+
+            const urls = isBrandSearch ? [
+                `https://api.fragella.com/api/v1/brands/${encodeURIComponent(query)}?limit=${limit}&offset=${offset}`,
+                `https://api.fragella.com/fragrances/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`
+            ] : [
+                `https://api.fragella.com/fragrances/search?q=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`,
+                `https://api.fragella.com/api/v1/brands/${encodeURIComponent(query)}?limit=${limit}&offset=${offset}`
             ];
 
-            let lastError = null;
-
-            for (const url of endpoints) {
+            for (const url of urls) {
                 try {
                     const response = await fetch(url, {
                         method: 'GET',
                         headers: {
                             'x-api-key': FRAGELLA_API_KEY,
-                            // Including widget key just in case it's required in headers for public integrations
-                            'x-widget-key': FRAGELLA_WIDGET_KEY, 
                             'Accept': 'application/json'
                         }
                     });
@@ -178,52 +224,49 @@
                         return await response.json();
                     }
                 } catch (err) {
-                    lastError = err;
-                    // Ignore CORS or network errors and try the next endpoint
+                    console.warn(`Endpoint failed: ${url}`, err);
                 }
             }
 
-            // If we fail all actual fetches (due to CORS in browser or wrong endpoint URL), 
-            // return graceful mock data so Skye's UI continues to work beautifully.
-            console.warn("Real API endpoints failed or blocked by CORS. Using fallback mock data for seamless UI demonstration.");
-            return { isMockFallback: true, query: query };
+            // Fallback to Mock Data
+            return { isMockFallback: true, query: query, page: page };
         }
 
-        // Render the UI Cards
+        function updatePaginationUI(data) {
+            pageInfo.textContent = `Page ${currentPage}`;
+            prevBtn.disabled = currentPage === 1;
+            
+            // In a real API, you'd check 'total' results. Here we assume more if we got a full page.
+            let items = extractItems(data);
+            nextBtn.disabled = items.length < limit;
+        }
+
+        function extractItems(data) {
+            if (data.isMockFallback) return getMockData(data.query, data.page);
+            if (Array.isArray(data)) return data;
+            if (data.data && Array.isArray(data.data)) return data.data;
+            if (data.results && Array.isArray(data.results)) return data.results;
+            if (data.fragrances && Array.isArray(data.fragrances)) return data.fragrances;
+            return [];
+        }
+
         function renderResults(data, originalQuery) {
-            resultsGrid.innerHTML = ''; // Clear old results
-
-            let items = [];
-
-            // Flexibly extract items from the API response structure
-            if (data.isMockFallback) {
-                items = getMockData(data.query);
-            } else if (Array.isArray(data)) {
-                items = data;
-            } else if (data.data && Array.isArray(data.data)) {
-                items = data.data;
-            } else if (data.results && Array.isArray(data.results)) {
-                items = data.results;
-            } else if (data.fragrances && Array.isArray(data.fragrances)) {
-                items = data.fragrances;
-            }
+            resultsGrid.innerHTML = '';
+            const items = extractItems(data);
 
             if (items.length === 0) {
-                showState('error', `We couldn't find any fragrances matching "${originalQuery}". Try another scent profile!`);
+                showState('error', `No fragrances found for "${originalQuery}" on this page.`);
                 return;
             }
 
-            // Generate Cards
             items.forEach(item => {
-                // Safely grab properties, accounting for various JSON structures
                 const name = item.name || item.title || 'Unknown Fragrance';
                 const brand = item.brand || item.brand_name || item.house || 'Designer Label';
                 const description = item.description || 
-                                   (item.notes ? `Key notes include: ${Array.isArray(item.notes) ? item.notes.join(', ') : item.notes}.` : 
+                                   (item.notes ? `Notes: ${Array.isArray(item.notes) ? item.notes.join(', ') : item.notes}.` : 
                                    'An elegant and captivating scent designed to leave a lasting impression.');
                 const imageUrl = item.image || item.image_url || item.thumbnail || getFallbackImage(name);
-                const price = item.price || item.msrp ? `$${item.price || item.msrp}` : '';
-                const launchYear = item.launch_year ? `<span class="text-xs text-gray-400 font-normal ml-2">(${item.launch_year})</span>` : '';
+                const price = item.price ? `$${item.price}` : '';
 
                 const card = document.createElement('div');
                 card.className = 'glass-panel rounded-3xl overflow-hidden flex flex-col group transition-all duration-300 hover:shadow-2xl hover:shadow-pink-200/50 transform hover:-translate-y-1.5 cursor-pointer';
@@ -240,10 +283,9 @@
                     </div>
                     <div class="p-6 flex-1 flex flex-col bg-white/40">
                         <p class="text-xs font-bold text-pink-500 tracking-widest uppercase mb-1">${brand}</p>
-                        <h3 class="text-xl font-bold text-gray-900 mb-2 serif-font leading-tight">${name} ${launchYear}</h3>
+                        <h3 class="text-xl font-bold text-gray-900 mb-2 serif-font leading-tight">${name}</h3>
                         <p class="text-sm text-gray-600 line-clamp-3 mb-4 flex-1 leading-relaxed">${description}</p>
                         
-                        <!-- Fragella Accords Widget -->
                         <div class="fragella-inject-accords mb-4" data-fragrance-name="${name}"></div>
 
                         <button class="w-full py-3 mt-auto rounded-2xl bg-white text-gray-800 font-semibold border border-pink-100 shadow-sm hover:bg-gradient-to-r hover:from-pink-50 hover:to-rose-50 hover:text-pink-600 hover:border-pink-300 transition-all active:scale-95">
@@ -254,86 +296,62 @@
                 resultsGrid.appendChild(card);
             });
 
+            // Re-trigger Fragella Enrich script to process new DOM elements
+            if (window.Fragella && typeof window.Fragella.enrich === 'function') {
+                window.Fragella.enrich();
+            }
+
             showState('results');
         }
 
-        // Helper to manage UI State
         function showState(state, message = "") {
             welcomeState.classList.add('hidden');
             loadingState.classList.add('hidden');
             errorState.classList.add('hidden');
-            resultsGrid.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
 
             if (state === 'loading') loadingState.classList.remove('hidden');
-            if (state === 'results') resultsGrid.classList.remove('hidden');
+            if (state === 'results') resultsContainer.classList.remove('hidden');
             if (state === 'error') {
                 errorState.classList.remove('hidden');
                 errorMessage.textContent = message;
             }
         }
 
-        // --- Fallback Handlers & Mock Data for demonstration purposes ---
         function getFallbackImage(name) {
-            // Assigns a consistent stock image based on the perfume name length
             const fallbacks = [
                 'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=600&q=80',
                 'https://images.unsplash.com/photo-1588405748880-12d1d2a59f75?auto=format&fit=crop&w=600&q=80',
                 'https://images.unsplash.com/photo-1523293111614-257a0774a385?auto=format&fit=crop&w=600&q=80',
                 'https://images.unsplash.com/photo-1557170334-a9632e77c6e4?auto=format&fit=crop&w=600&q=80'
             ];
-            return fallbacks[name.length % fallbacks.length];
+            return fallbacks[Math.abs(name.length) % fallbacks.length];
         }
 
-        function getMockData(query) {
-            const allMocks = [
-                {
-                    name: 'Baccarat Rouge 540',
-                    brand: 'Maison Francis Kurkdjian',
-                    description: 'A luminous and sophisticated fragrance mapping jasmine, saffron, cedarwood, and ambergris. An unforgettable olfactory signature.',
-                    price: '325',
-                    image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=600&q=80',
-                    launch_year: '2015'
-                },
-                {
-                    name: 'Santal 33',
-                    brand: 'Le Labo',
-                    description: 'A cult-favorite featuring cardamom, iris, violet, and ambrox. Smoking wood alloy (Australian sandalwood, cedarwood) lends it a spicy, leathery, musky edge.',
-                    price: '230',
-                    image: 'https://images.unsplash.com/photo-1588405748880-12d1d2a59f75?auto=format&fit=crop&w=600&q=80',
-                    launch_year: '2011'
-                },
-                {
-                    name: 'Lost Cherry',
-                    brand: 'Tom Ford',
-                    description: 'A luscious, full-bodied scent that contrasts a playful, candy-like gleam on the outside with luscious flesh on the inside.',
-                    price: '395',
-                    image: 'https://images.unsplash.com/photo-1523293111614-257a0774a385?auto=format&fit=crop&w=600&q=80',
-                    launch_year: '2018'
-                },
-                {
-                    name: 'Cloud',
-                    brand: 'Ariana Grande',
-                    description: 'An uplifting and dreamy blend of lavender blossom, juicy pear, and mouthwatering bergamot. Heart notes feature crème de coconut, praline, and vanilla orchid.',
-                    price: '65',
-                    image: 'https://images.unsplash.com/photo-1557170334-a9632e77c6e4?auto=format&fit=crop&w=600&q=80',
-                    launch_year: '2018'
-                },
-                {
-                    name: 'Bleu de Chanel',
-                    brand: 'Chanel',
-                    description: 'A profoundly sensual woody and aromatic fragrance. Fresh citrus accord opens up to reveal an intense heart of cedar and sandalwood.',
-                    price: '145',
-                    image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?auto=format&fit=crop&w=600&q=80',
-                    launch_year: '2010'
-                }
-            ];
+        function getMockData(query, page) {
+            // Expanded mock data to simulate pagination
+            const allMocks = [];
+            const brands = ['Dior', 'Chanel', 'Tom Ford', 'YSL', 'Gucci'];
+            
+            for(let i=1; i<=25; i++) {
+                const brand = brands[i % brands.length];
+                allMocks.push({
+                    name: `${brand} Scent No. ${i}`,
+                    brand: brand,
+                    description: `A premium fragrance experience part of our luxury collection number ${i}.`,
+                    price: (50 + (i * 10)).toString(),
+                    image: getFallbackImage(`scent${i}`)
+                });
+            }
 
             const lowercaseQuery = query.toLowerCase();
-            return allMocks.filter(m => 
+            const filtered = allMocks.filter(m => 
                 m.name.toLowerCase().includes(lowercaseQuery) || 
-                m.brand.toLowerCase().includes(lowercaseQuery) ||
-                m.description.toLowerCase().includes(lowercaseQuery)
+                m.brand.toLowerCase().includes(lowercaseQuery)
             );
+
+            const offset = (page - 1) * limit;
+            return filtered.slice(offset, offset + limit);
         }
     </script>
 </body>
